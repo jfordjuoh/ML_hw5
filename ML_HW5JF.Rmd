@@ -37,10 +37,9 @@ test.data <- alc[-train.indices, ]
 #REGULARIZED REGRESSION: ELASTIC NET
 set.seed(123)
 
-en.model<- train(
+en.model <- train(
   alc_consumption ~., data = train.data, method = "glmnet",
-  trControl = trainControl("cv", number = 10), preProc=c("center", "scale"),
- tuneLength=10
+  trControl = trainControl("cv", number = 10), preProc = c("center", "scale"), tuneLength = 10
   )
 #Print the values of alpha and lambda that gave best prediction
 en.model$bestTune %>% knitr::kable()
@@ -51,24 +50,68 @@ en.model$results %>% knitr::kable()
 # Model coefficients
 coef(en.model$finalModel, en.model$bestTune$lambda) 
 
-# Make predictions in test set
-en.pred = en.model %>% predict(test.data)
+#Confusion Matrix
+confusionMatrix(en.model) 
 
-#Caret doesn't work if your binary response is of character/logical so you have to rename the levels as factors.
-test.data = test.data %>%
-mutate(alc_consumption = as.factor(alc_consumption))
+#This is the extra part idk if its needed of right
+# Make predictions in test set
+#en.pred = en.model %>% predict(test.data)
+
+#NTS:Caret doesn't work if your binary response is of character/logical so you have to rename the levels as factors.
+#test.data = test.data %>%
+#mutate(alc_consumption = as.factor(alc_consumption))
 
 # Model prediction performance
-postResample(en.pred,test.data$alc_consumption) %>% knitr::kable()
 
 ```
 
 ```{r}
 #LOGISTIC REGRESSION
+
+logistic_control1 <- trainControl(method = "cv", number = 3, savePredictions = T)
+
+set.seed(1000)
+logistic <- train(alc_consumption ~ ., data = alc, method = "glm", family = "binomial", trControl = logistic_control1)
+
+summary(logistic)
+
+confusionMatrix(logistic) 
+
+confusionMatrix(table((logistic$pred)$pred,(logistic$pred)$obs))
 ```
 
 ```{r}
 #LASSO
+
+#NTS: first create a grid to search lambda
+lambda <- 10^seq(-3,3, length = 100)
+
+set.seed(100)
+
+#NTS: replace tuneLength with tuneGrid and alpha is 1 because we are doing lasso. If we were doing rigid it would be 0. 
+lasso_m <- train(
+  alc_consumption ~., data = train.data, method = "glmnet", trControl = trainControl("cv", number = 10), preProc = c("center", "scale"), tuneGrid = expand.grid(alpha = 1, lambda = lambda)
+)
+
+#Print the values of alpha and lambda that gave best prediction
+lasso_m$bestTune %>% knitr::kable()
+
+#Print all of the options examined
+lasso_m$results %>% knitr::kable()
+
+# Model coefficients
+coef(lasso_m$finalModel, lasso_m$bestTune$lambda)
+
+#Confusion Matrix
+confusionMatrix(lasso_m) 
+
+
+# Make predictions in test set
+#en.pred <- en.model %>% predict(test.data)
+
+# Model prediction performance
+#postResample(en.pred,test.data$life_exp) 
+
 ```
 
 
@@ -76,6 +119,12 @@ postResample(en.pred,test.data$alc_consumption) %>% knitr::kable()
 
 ```{r}
 #Q2 Task: You should tune and compare the performance of all three models within the training set using cross-validation and then decide which model you would choose as your final model. Provide justification for your choice.
+
+How do you know which one is the best? 
+This can be done looking at the hyperparameter-specific results(i.e. finding the best tune values and then finding that in the results table (model$results)) seeing the performance metric for that value. Or you can use the confusion matric on the model object created by the train function. 
+
+I would use the logistic regression because the false negatives would be lower? Nut the other two have a higher accuracy so I would go with those? I think I would use lasso bc of the feeautre selection and when you look at the accuracy of the best lambda, it is bigger for the lasso. The lasso also had only one vairable that did not go to zero and in the EN the other variable that did not go to zero had such a small change it could be neglibile.    .
+
 ```
 
 
@@ -83,6 +132,7 @@ postResample(en.pred,test.data$alc_consumption) %>% knitr::kable()
 ```{r}
 #Q3 Task: Apply your final model in the test set and report your final evaluation metrics. 
 
+#may have to apply/copy the # Make predictions in test set and the # Model prediction performance to here for the model I select
 ```
 
 
