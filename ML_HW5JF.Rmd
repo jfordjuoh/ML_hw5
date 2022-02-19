@@ -1,0 +1,103 @@
+---
+title: "MLHW5_JF"
+date: February 11, 2022
+output: word_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+library(tidyverse) 
+library(caret)
+library(glmnet)
+library(klaR)
+library(dplyr)
+library(readxl)
+library(knitr)
+```
+
+# QI: You should create and compare three different models. Remember to remove the ID variable as you do not want to include that in your analysis. 
+```{r}
+set.seed(100)
+
+alc = read.csv("/Users/judyfordjuoh/Desktop/Machine Learning/ML_hw5/alcohol_use.csv")
+
+#Strip off ID Variable
+alc <- alc[,2:9]
+
+#tidyverse way to create data partition (70/30)
+#training.data<-chr$life_exp %>% createDataPartition(p=0.7, list=F)
+train.indices <- createDataPartition(y = alc$alc_consumption,p = 0.7,list = FALSE)
+train.data <- alc[train.indices, ]
+test.data <- alc[-train.indices, ]
+
+```
+
+```{r} 
+#REGULARIZED REGRESSION: ELASTIC NET
+set.seed(123)
+
+en.model<- train(
+  alc_consumption ~., data = train.data, method = "glmnet",
+  trControl = trainControl("cv", number = 10), preProc=c("center", "scale"),
+ tuneLength=10
+  )
+#Print the values of alpha and lambda that gave best prediction
+en.model$bestTune %>% knitr::kable()
+
+#Print all of the options examined. Bc this is a logistic regression we are using the Accuracy. If it was linear regression it would be MSE/RMSE.
+en.model$results %>% knitr::kable()
+
+# Model coefficients
+coef(en.model$finalModel, en.model$bestTune$lambda) 
+
+# Make predictions in test set
+en.pred = en.model %>% predict(test.data)
+
+#Caret doesn't work if your binary response is of character/logical so you have to rename the levels as factors.
+test.data = test.data %>%
+mutate(alc_consumption = as.factor(alc_consumption))
+
+# Model prediction performance
+postResample(en.pred,test.data$alc_consumption) %>% knitr::kable()
+
+```
+
+```{r}
+#LOGISTIC REGRESSION
+```
+
+```{r}
+#LASSO
+```
+
+
+# Q2
+
+```{r}
+#Q2 Task: You should tune and compare the performance of all three models within the training set using cross-validation and then decide which model you would choose as your final model. Provide justification for your choice.
+```
+
+
+# Q3
+```{r}
+#Q3 Task: Apply your final model in the test set and report your final evaluation metrics. 
+
+```
+
+
+# Q4
+```{r}
+#Q4 Task: Produce a shareable report of your analysis and results using R Markdown.
+
+```
+
+
+# Q5
+```{r}
+#Q5 Task: What research questions could this analysis either a) directly address or b) indirectly help to address by providing information that could be used in subsequent analyses? Limit this response to no more than 1 paragraph. Be sure to use complete sentences.
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
