@@ -1,6 +1,6 @@
 ---
 title: "MLHW5_JF"
-date: February 11, 2022
+date: February 21, 2022
 output: word_document
 editor_options:
   chunk_output_type: console
@@ -25,6 +25,15 @@ alc = read.csv("/Users/judyfordjuoh/Desktop/Machine Learning/ML_hw5/alcohol_use.
 #Strip off ID Variable
 alc <- alc[,2:9]
 
+#Make alcohol use into a alcohol consumption (0 for current use and 1 for current use) #From OH
+alc$alc_consumption <- factor(alc$alc_consumption, levels = c("NotCurrentUse", "CurrentUse"))
+
+#Check distributions, missing data etc.#From OH
+summary(alc)
+
+#Omit those with missing data #From OH
+alc <- na.omit(alc)
+
 #tidyverse way to create data partition (70/30)
 #training.data<-chr$life_exp %>% createDataPartition(p=0.7, list=F)
 train.indices <- createDataPartition(y = alc$alc_consumption,p = 0.7,list = FALSE)
@@ -42,7 +51,7 @@ en.model <- train(
   trControl = trainControl("cv", number = 10), preProc = c("center", "scale"), tuneLength = 10
   )
 #Print the values of alpha and lambda that gave best prediction
-en.model$bestTune %>% knitr::kable()
+en.model$bestTune %>% knitr::kable() # 0.6(alpha)| 0.2641193(lambda)| 0.8545881|(accuracy) 
 
 #Print all of the options examined. Bc this is a logistic regression we are using the Accuracy. If it was linear regression it would be MSE/RMSE.
 en.model$results %>% knitr::kable()
@@ -53,16 +62,6 @@ coef(en.model$finalModel, en.model$bestTune$lambda)
 #Confusion Matrix
 confusionMatrix(en.model) 
 
-#This is the extra part idk if its needed of right
-# Make predictions in test set
-#en.pred = en.model %>% predict(test.data)
-
-#NTS:Caret doesn't work if your binary response is of character/logical so you have to rename the levels as factors.
-#test.data = test.data %>%
-#mutate(alc_consumption = as.factor(alc_consumption))
-
-# Model prediction performance
-
 ```
 
 ```{r}
@@ -71,7 +70,7 @@ confusionMatrix(en.model)
 logistic_control1 <- trainControl(method = "cv", number = 3, savePredictions = T)
 
 set.seed(1000)
-logistic <- train(alc_consumption ~ ., data = alc, method = "glm", family = "binomial", trControl = logistic_control1)
+logistic <- train(alc_consumption ~ ., data = train.data, method = "glm", family = "binomial", trControl = logistic_control1)
 
 summary(logistic)
 
@@ -79,6 +78,7 @@ confusionMatrix(logistic)
 
 confusionMatrix(table((logistic$pred)$pred,(logistic$pred)$obs))
 ```
+
 
 ```{r}
 #LASSO
@@ -94,7 +94,7 @@ lasso_m <- train(
 )
 
 #Print the values of alpha and lambda that gave best prediction
-lasso_m$bestTune %>% knitr::kable()
+lasso_m$bestTune %>% knitr::kable() # 1(alpha)|0.23101(lambda)|0.8538 (Accuracy)
 
 #Print all of the options examined
 lasso_m$results %>% knitr::kable()
@@ -105,49 +105,79 @@ coef(lasso_m$finalModel, lasso_m$bestTune$lambda)
 #Confusion Matrix
 confusionMatrix(lasso_m) 
 
-
-# Make predictions in test set
-#en.pred <- en.model %>% predict(test.data)
-
-# Model prediction performance
-#postResample(en.pred,test.data$life_exp) 
-
 ```
 
 
-# Q2
+# Q2: Decide which model you would choose as your final model
 
 ```{r}
 #Q2 Task: You should tune and compare the performance of all three models within the training set using cross-validation and then decide which model you would choose as your final model. Provide justification for your choice.
 
-How do you know which one is the best? 
-This can be done looking at the hyperparameter-specific results(i.e. finding the best tune values and then finding that in the results table (model$results)) seeing the performance metric for that value. Or you can use the confusion matric on the model object created by the train function. 
+#Make a calibration plot to see which one is the best
 
-I would use the logistic regression because the false negatives would be lower? Nut the other two have a higher accuracy so I would go with those? I think I would use lasso bc of the feeautre selection and when you look at the accuracy of the best lambda, it is bigger for the lasso. The lasso also had only one vairable that did not go to zero and in the EN the other variable that did not go to zero had such a small change it could be neglibile.    .
+#EN Calibration
+fitted.results_model1 <- en.model %>% predict(test.data)
 
+error_model1 <- mean(fitted.results_model1 !=test.data$alc_consumption, na.rm = T)
+
+print(paste('Accuracy [en.model]', 1-error_model1))
+
+testProb <- data.frame(obs = test.data$alc_consumption,
+                        pred.logit = error_model1)
+
+calPlotData_model1<- calibration(obs~as.numeric(pred.logit), data = testProb)
+
+xyplot(calPlotData_model1, auto.key = list(columns = 2))
+
+#Logistic regression Calibration
+fitted.results_model2 <- logistic %>% predict(test.data)
+
+error_model2 <- mean(fitted.results_model2 !=test.data$alc_consumption, na.rm = T)
+
+print(paste('Accuracy [logistic]', 1-error_model2))
+
+testProb2 <- data.frame(obs = test.data$alc_consumption,
+                        pred.logit2 = error_model2)
+
+calPlotData_model2<- calibration(obs~as.numeric(pred.logit2), data = testProb2)
+
+xyplot(calPlotData_model2, auto.key = list(columns = 2))
+
+#LASSO Calibration
+fitted.results_model3 <- lasso_m %>% predict(test.data)
+
+error_model3 <- mean(fitted.results_model3 !=test.data$alc_consumption, na.rm = T)
+
+print(paste('Accuracy [lasso_m]', 1-error_model3))
+
+testProb3 <- data.frame(obs = test.data$alc_consumption,
+                        pred.logit3 = error_model3)
+
+calPlotData_model3<- calibration(obs~as.numeric(pred.logit3), data = testProb3)
+
+xyplot(calPlotData_model3, auto.key = list(columns = 2))
 ```
 
+In the elastic net model, the average accuracy was 0.8545. The intercept was 0.1365 and the remaining variables went to zero, except for Measure of Impulsivity (impulsiveness_score = 0.4253). The best predicting alpha and lambda was 0.6(alpha) and 0.2641(lambda), which resulted in an accuracy of 0.8545.
 
-# Q3
+In the logistic regression model the average accuracy was 0.8152 and the sensitivity and specificity was 0.7942 and 0.8336, respectively.
+
+In the LASSO model, the average accuracy was 0.8538. The intercept was 0.1336 and the remaining variables went to zero, except for Measure of Impulsivity (impulsiveness_score = 0.3038).The best predicting alpha and lambda was 1(alpha) and 0.2310(lambda), which resulted in an accuracy of 0.8545.
+
+Both the elastic net model and the LASSO model had the same average accuracy, which was higher than the logistic regression, as well as the same calibration plot. Although it may seem like I can use either the elastic net or the lasso model for my final model, I am choosing the elastic net model because elastic Net combines characteristics of both lasso and ridge. Elastic Net reduces the impact of different features while not eliminating all of the features. The elastic net model also had a larger beta for impulsiveness_score compared to the LASSO model which can mean there is a relationship between this feature and the outcome which is worth further exploring. 
+
+# Q3: Apply your final model in the test set and report your final evaluation metrics
 ```{r}
-#Q3 Task: Apply your final model in the test set and report your final evaluation metrics. 
+#Using the test data to make predictions
 
-#may have to apply/copy the # Make predictions in test set and the # Model prediction performance to here for the model I select
-```
-
-
-# Q4
-```{r}
-#Q4 Task: Produce a shareable report of your analysis and results using R Markdown.
+en_pred2 <- en.model %>% predict(test.data)
+confusionMatrix(en_pred2,as.factor(test.data$alc_consumption))
 
 ```
-
+After applying my final model in the test set, the average accuracy was 0.8478 and the sensitivity and specificity was 0.6742 and 1, respectively. The positive predictive value and the negative predictive value were 1 and 0.778, respectively. 
 
 # Q5
 ```{r}
 #Q5 Task: What research questions could this analysis either a) directly address or b) indirectly help to address by providing information that could be used in subsequent analyses? Limit this response to no more than 1 paragraph. Be sure to use complete sentences.
-
-
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+This research can be used for a plethora of research questions. This research can be used to directly address: does an individual’s measure of impulsiveness affect their current use of alcohol? This research can be used to further indirectly help to address reaserch concerning the relationship between impulsiveness and sensation-seeking behaviors amongst NYC young adults (18-25 years old) and the rate of drunk driving deaths caused by NYC young adults.
