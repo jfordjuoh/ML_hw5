@@ -115,19 +115,21 @@ confusionMatrix(lasso_m)
 
 #Make a calibration plot to see which one is the best
 
+
 #EN Calibration
-fitted.results_model1 <- en.model %>% predict(test.data)
+fitted.results_modelen <- en.model %>% predict(train.data)
 
-error_model1 <- mean(fitted.results_model1 !=test.data$alc_consumption, na.rm = T)
+error_model_4 <- mean(fitted.results_modelen !=train.data$alc_consumption, na.rm = T)
 
-print(paste('Accuracy [en.model]', 1-error_model1))
+print(paste('Accuracy [en.model]', 1-error_model_4))
 
-testProb <- data.frame(obs = test.data$alc_consumption,
-                        pred.logit = error_model1)
+testProb <- data.frame(obs = train.data$alc_consumption,
+                        pred.logit = error_model_4)
 
-calPlotData_model1<- calibration(obs~as.numeric(pred.logit), data = testProb)
+calPlotData_model4<- calibration(obs~as.numeric(pred.logit), data = testProb)
 
-xyplot(calPlotData_model1, auto.key = list(columns = 2))
+xyplot(calPlotData_model4, auto.key = list(columns = 2))
+
 
 #Logistic regression Calibration
 fitted.results_model2 <- logistic %>% predict(test.data)
@@ -143,19 +145,20 @@ calPlotData_model2<- calibration(obs~as.numeric(pred.logit2), data = testProb2)
 
 xyplot(calPlotData_model2, auto.key = list(columns = 2))
 
+
 #LASSO Calibration
-fitted.results_model3 <- lasso_m %>% predict(test.data)
+fitted.results_model5 <- lasso_m %>% predict(train.data)
 
-error_model3 <- mean(fitted.results_model3 !=test.data$alc_consumption, na.rm = T)
+error_model5 <- mean(fitted.results_model5 !=test.data$alc_consumption, na.rm = T)
 
-print(paste('Accuracy [lasso_m]', 1-error_model3))
+print(paste('Accuracy [lasso_m]', 1-error_model5))
 
-testProb3 <- data.frame(obs = test.data$alc_consumption,
-                        pred.logit3 = error_model3)
+testProb5 <- data.frame(obs = test.data$alc_consumption,
+                        pred.logit5 = error_model5)
 
-calPlotData_model3<- calibration(obs~as.numeric(pred.logit3), data = testProb3)
+calPlotData_model5<- calibration(obs~as.numeric(pred.logit5), data = testProb5)
 
-xyplot(calPlotData_model3, auto.key = list(columns = 2))
+xyplot(calPlotData_model5, auto.key = list(columns = 2))
 ```
 
 In the elastic net model, the average accuracy was 0.8545. The intercept was 0.1365 and the remaining variables went to zero, except for Measure of Impulsivity (impulsiveness_score = 0.4253). The best predicting alpha and lambda was 0.6(alpha) and 0.2641(lambda), which resulted in an accuracy of 0.8545.
@@ -164,17 +167,30 @@ In the logistic regression model the average accuracy was 0.8152 and the sensiti
 
 In the LASSO model, the average accuracy was 0.8538. The intercept was 0.1336 and the remaining variables went to zero, except for Measure of Impulsivity (impulsiveness_score = 0.3038).The best predicting alpha and lambda was 1(alpha) and 0.2310(lambda), which resulted in an accuracy of 0.8545.
 
-Both the elastic net model and the LASSO model had the same average accuracy, which was higher than the logistic regression, as well as the same calibration plot. Although it may seem like I can use either the elastic net or the lasso model for my final model, I am choosing the elastic net model because elastic Net combines characteristics of both lasso and ridge. Elastic Net reduces the impact of different features while not eliminating all of the features. The elastic net model also had a larger beta for impulsiveness_score compared to the LASSO model which can mean there is a relationship between this feature and the outcome which is worth further exploring. 
+Both the elastic net model and the LASSO model had the same average accuracy, which was higher than the logistic regression, as well as the same calibration plot. Although it may seem like I can use either the elastic net or the lasso model for my final model, I am choosing the elastic net model because elastic Net combines characteristics of both lasso and ridge. Elastic Net reduces the impact of different features while not eliminating all of the features. The elastic net model also had a larger beta for impulsiveness_score compared to the LASSO model which can mean there is a relationship between this feature and the outcome which is worth further exploring. Also the coefficients in the elastic net model was slightly larger than the coefficients in the LASSO model.
 
 # Q3: Apply your final model in the test set and report your final evaluation metrics
 ```{r}
 #Using the test data to make predictions
 
 en_pred2 <- en.model %>% predict(test.data)
-confusionMatrix(en_pred2,as.factor(test.data$alc_consumption))
+confusionMatrix(en_pred2,test.data$alc_consumption, positive = "CurrentUse")
+
+#Obtain predicted probabilities
+test.outcome.probs<-predict(en.model, test.data, type="prob")
+
+testProbs.rmodel <- data.frame(obs = test.data$alc_consumption,
+                        pred.en=test.outcome.probs[,2])
+
+#Create calibration plot
+alc_PlotData.rmodel<-calibration(obs ~ pred.en, data = testProbs.rmodel, class="CurrentUse", cuts=5)
+
+xyplot(alc_PlotData.rmodel, auto.key = list(columns = 2))
+
+plot(test.outcome.probs[,2])
 
 ```
-After applying my final model in the test set, the average accuracy was 0.8478 and the sensitivity and specificity was 0.6742 and 1, respectively. The positive predictive value and the negative predictive value were 1 and 0.778, respectively. 
+After applying my final model in the test set, the average accuracy was 0.8478 and the sensitivity and specificity was 1 and 0.6742, respectively. The positive predictive value and the negative predictive value were 0.778 and 1, respectively. Based on the calibration plot, we see that there are points where the two lines are very close, showing that the model has a good fit.
 
 # Q5
 ```{r}
